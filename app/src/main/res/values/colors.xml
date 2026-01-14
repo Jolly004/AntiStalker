@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary_dark">#151130</color> <!-- Deep Navy Blue Background -->
+    <color name="primary_light">#221B4A</color> <!-- Slightly lighter blue for cards -->
+    <color name="accent">#40E0D0</color> <!-- Bright Mint/Turquoise Green -->
+    <color name="accent_ripple">#8040E0D0</color>
+    <color name="background_light">#151130</color> <!-- Match primary dark -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="gray">#B0BEC5</color>
+    <color name="safe_green">#00E676</color>
+    
+    <!-- Retain old names to prevent build breaks if referenced elsewhere, mapping them to new scheme -->
+    <color name="purple_200">@color/primary_light</color>
+    <color name="purple_500">@color/primary_dark</color>
+    <color name="purple_700">@color/primary_dark</color>
+    <color name="teal_200">@color/accent</color>
+    <color name="teal_700">@color/accent</color>
+</resources>
