@@ -1,0 +1,19 @@
+# User-specific configurations
+local.properties
+.idea/
+
+# Build caches and temporary files
+.gradle/
+build/
+app/build/
+.cxx/
+.externalNativeBuild/
+
+# IDE files
+*.iml
+*.DS_Store
+
+# Generated files (we keep your manual AntiStalker.apk, but ignore others)
+*.apk
+*.aab
+!AntiStalker.apk
