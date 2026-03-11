@@ -16,6 +16,7 @@ class ScanResultAdapter(
 ) : RecyclerView.Adapter<ScanResultAdapter.ViewHolder>() {
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val vClickableOverlay: View = view.findViewById(R.id.vClickableOverlay)
         val appName: TextView = view.findViewById(R.id.tvAppName)
         val packageName: TextView = view.findViewById(R.id.tvPackageName)
         val appIcon: ImageView = view.findViewById(R.id.ivAppIcon)
@@ -37,19 +38,32 @@ class ScanResultAdapter(
         holder.appIcon.setImageDrawable(result.appInfo.icon)
         
         holder.riskLevel.text = result.riskLevel.name
-        when (result.riskLevel) {
-            RiskLevel.CRITICAL -> holder.riskLevel.setTextColor(Color.parseColor("#B71C1C")) // Dark Red
-            RiskLevel.HIGH -> holder.riskLevel.setTextColor(Color.RED)
-            RiskLevel.MEDIUM -> holder.riskLevel.setTextColor(Color.parseColor("#FFA500")) // Orange
-            RiskLevel.LOW -> holder.riskLevel.setTextColor(Color.parseColor("#FFD700")) // Gold
-            RiskLevel.SAFE -> holder.riskLevel.setTextColor(Color.GREEN)
+        val color = when (result.riskLevel) {
+            RiskLevel.CRITICAL -> Color.parseColor("#FF5252") // Red
+            RiskLevel.HIGH -> Color.parseColor("#FF5252")
+            RiskLevel.MEDIUM -> Color.parseColor("#FFA726") // Orange
+            RiskLevel.LOW -> Color.parseColor("#FFEE58") // Yellow
+            RiskLevel.SAFE -> Color.parseColor("#66BB6A") // Green
         }
+        holder.riskLevel.setTextColor(color)
+        
+        // Update background tint for badge effect if using a shape drawable with tint support
+        // For now, just text color is updated as per previous logic, but the layout uses a semi-transparent bg.
 
         holder.riskFactors.text = result.riskFactors.joinToString("\n") { "- $it" }
 
         // Click listeners
-        holder.itemView.setOnClickListener { onItemClick(result) }
-        holder.btnUninstall.setOnClickListener { onUninstallClick(result) }
+        holder.itemView.isClickable = false
+        // Use the overlay for item clicks, allowing the button (which is above it) to receive its own clicks
+        holder.vClickableOverlay.setOnClickListener { onItemClick(result) }
+        
+        // Use a more robust click listener for the button
+        holder.btnUninstall.isClickable = true
+        holder.btnUninstall.isFocusable = true
+        holder.btnUninstall.bringToFront()
+        holder.btnUninstall.setOnClickListener { 
+            onUninstallClick(result)
+        }
     }
 
     override fun getItemCount() = results.size

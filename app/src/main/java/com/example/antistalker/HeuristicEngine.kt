@@ -10,6 +10,19 @@ class HeuristicEngine(private val context: Context) {
     private val accessibilityDetector = AccessibilityDetector()
 
     fun analyzeApp(appInfo: AppInfo): ScanResult {
+        // Get Sensitivity Settings
+        val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+        val sensitivity = prefs.getInt("scan_sensitivity", 5) // Default 5 (Medium)
+
+        // Define Thresholds based on Sensitivity
+        // Sensitivity 3 (High/Aggressive) -> Lower thresholds
+        // Sensitivity 5 (Medium/Default) -> Standard thresholds
+        // Sensitivity 10 (Low/Lenient) -> Higher thresholds
+        
+        val criticalThreshold = if (sensitivity == 3) 15 else if (sensitivity == 10) 30 else 20
+        val highThreshold = if (sensitivity == 3) 7 else if (sensitivity == 10) 20 else 10
+        val mediumThreshold = if (sensitivity == 3) 3 else if (sensitivity == 10) 10 else 5
+        
         // --- SIDELOAD CHECK ---
         // Trusted Installers: Google Play Store
         val isTrustedInstaller = appInfo.installerSource == "com.android.vending" ||
@@ -74,7 +87,7 @@ class HeuristicEngine(private val context: Context) {
             riskFactors.add("Has Device Admin Privileges")
             riskScore += 3
             
-            // If it's a hidden user app with Admin privs, it's very dangerous
+            // If it's a hidden user app with Admin privs, it more dangerous
             if (hiddenAppDetector.isHidden(appInfo.packageName) && !appInfo.isSystemApp) {
                 riskFactors.add("Hidden Device Admin (Malware Indicator)")
                 riskScore += 10
@@ -95,9 +108,9 @@ class HeuristicEngine(private val context: Context) {
         
         // Determine Risk Level
         val riskLevel = when {
-            riskScore >= 20 || dangerousCount >= 6 -> RiskLevel.CRITICAL
-            riskScore >= 10 -> RiskLevel.HIGH
-            riskScore >= 5 -> RiskLevel.MEDIUM
+            riskScore >= criticalThreshold || dangerousCount >= 6 -> RiskLevel.CRITICAL
+            riskScore >= highThreshold -> RiskLevel.HIGH
+            riskScore >= mediumThreshold -> RiskLevel.MEDIUM
             riskScore >= 1 -> RiskLevel.LOW
             else -> RiskLevel.SAFE
         }

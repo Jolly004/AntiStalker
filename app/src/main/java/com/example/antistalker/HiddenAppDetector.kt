@@ -14,15 +14,7 @@ class HiddenAppDetector(private val context: Context) {
         }
     }
     
-    // Known stalkerware package names (example list - would be larger in production)
-    private val knownStalkerwarePackages = listOf(
-        "com.monitor.app",
-        "com.spy.tracker",
-        "com.cerberus.android",
-        "com.flexispy.android"
-    )
-
     fun isKnownStalkerware(packageName: String): Boolean {
-        return knownStalkerwarePackages.contains(packageName)
+        return StalkerwareDefinitions.KNOWN_PACKAGES.contains(packageName)
     }
 }
