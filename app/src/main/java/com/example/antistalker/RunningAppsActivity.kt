@@ -56,7 +56,7 @@ class RunningAppsActivity : AppCompatActivity() {
                 openAppInfo(result.appInfo.packageName)
             },
             onUninstallClick = { result ->
-                requestUninstall(result.appInfo.packageName)
+                openAppInfo(result.appInfo.packageName)
             }
         )
         
@@ -159,11 +159,24 @@ class RunningAppsActivity : AppCompatActivity() {
 
     private fun requestUninstall(packageName: String) {
         try {
-            val intent = Intent(Intent.ACTION_DELETE)
-            intent.data = Uri.parse("package:$packageName")
-            startActivity(intent)
+            val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE).apply {
+                data = Uri.parse("package:$packageName")
+                putExtra(Intent.EXTRA_RETURN_RESULT, true)
+            }
+
+            if (intent.resolveActivity(packageManager) != null) {
+                startActivity(intent)
+            } else {
+                Toast.makeText(
+                    this,
+                    "Uninstall screen unavailable, opening app settings instead.",
+                    Toast.LENGTH_SHORT
+                ).show()
+                openAppInfo(packageName)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
+            Toast.makeText(this, "Error requesting uninstall: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 

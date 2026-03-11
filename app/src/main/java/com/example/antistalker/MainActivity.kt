@@ -85,7 +85,7 @@ class MainActivity : AppCompatActivity() {
                 openAppSettings(result.appInfo.packageName)
             },
             onUninstallClick = { result ->
-                requestUninstall(result.appInfo.packageName)
+                openAppSettings(result.appInfo.packageName)
             }
         )
         
@@ -143,6 +143,24 @@ class MainActivity : AppCompatActivity() {
     private val REQUEST_CODE_DEVICE_ADMIN = 1001
     private var pendingUninstallPackage: String? = null
 
+    private fun launchUninstallIntent(packageName: String) {
+        val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE).apply {
+            data = Uri.parse("package:$packageName")
+            putExtra(Intent.EXTRA_RETURN_RESULT, true)
+        }
+
+        if (intent.resolveActivity(packageManager) != null) {
+            startActivity(intent)
+        } else {
+            Toast.makeText(
+                this,
+                "Uninstall screen unavailable, opening app settings instead.",
+                Toast.LENGTH_SHORT
+            ).show()
+            openAppSettings(packageName)
+        }
+    }
+
     private fun requestUninstall(packageName: String) {
         try {
             // Check if it's a Device Admin
@@ -188,11 +206,7 @@ class MainActivity : AppCompatActivity() {
                     .setNegativeButton("Cancel") { _, _ -> pendingUninstallPackage = null }
                     .show()
             } else {
-                // Standard Uninstall
-                val intent = Intent(Intent.ACTION_DELETE)
-                intent.data = Uri.parse("package:$packageName")
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                startActivity(intent)
+                launchUninstallIntent(packageName)
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -220,9 +234,7 @@ class MainActivity : AppCompatActivity() {
 
                 if (!isAdmin) {
                     // Admin rights revoked! Proceed to uninstall.
-                    val intent = Intent(Intent.ACTION_DELETE)
-                    intent.data = Uri.parse("package:$packageName")
-                    startActivity(intent)
+                    launchUninstallIntent(packageName)
                 } else {
                     // Still admin
                     // Prompt user again if they failed to disable it

@@ -16,7 +16,6 @@ class ScanResultAdapter(
 ) : RecyclerView.Adapter<ScanResultAdapter.ViewHolder>() {
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val vClickableOverlay: View = view.findViewById(R.id.vClickableOverlay)
         val appName: TextView = view.findViewById(R.id.tvAppName)
         val packageName: TextView = view.findViewById(R.id.tvPackageName)
         val appIcon: ImageView = view.findViewById(R.id.ivAppIcon)
@@ -53,14 +52,10 @@ class ScanResultAdapter(
         holder.riskFactors.text = result.riskFactors.joinToString("\n") { "- $it" }
 
         // Click listeners
-        holder.itemView.isClickable = false
-        // Use the overlay for item clicks, allowing the button (which is above it) to receive its own clicks
-        holder.vClickableOverlay.setOnClickListener { onItemClick(result) }
-        
-        // Use a more robust click listener for the button
+        holder.itemView.isClickable = true
+        holder.itemView.setOnClickListener { onItemClick(result) }
         holder.btnUninstall.isClickable = true
         holder.btnUninstall.isFocusable = true
-        holder.btnUninstall.bringToFront()
         holder.btnUninstall.setOnClickListener { 
             onUninstallClick(result)
         }

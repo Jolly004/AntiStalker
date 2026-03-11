@@ -41,8 +41,15 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         // Setup Background Scan Toggle
-        val isBackgroundScanEnabled = prefs.getBoolean("background_scan", false)
+        // Default to true if not set
+        val isBackgroundScanEnabled = prefs.getBoolean("background_scan", true)
         switchBackgroundScan.isChecked = isBackgroundScanEnabled
+        
+        // Ensure the worker is scheduled if it's supposed to be enabled (e.g. first run)
+        if (isBackgroundScanEnabled) {
+            scheduleBackgroundScan()
+        }
+
         switchBackgroundScan.setOnCheckedChangeListener { _, isChecked ->
             prefs.edit().putBoolean("background_scan", isChecked).apply()
             if (isChecked) {
