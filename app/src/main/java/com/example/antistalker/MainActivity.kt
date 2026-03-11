@@ -303,10 +303,28 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     tvNoThreats.visibility = View.GONE
                     rvResults.visibility = View.VISIBLE
-                    tvStatusValue.text = "At Risk"
-                    tvStatusValue.setTextColor(resources.getColor(R.color.white, theme)) // Or red if defined
-                    // Better to use Color.RED or a specific color resource
-                    tvStatusValue.setTextColor(android.graphics.Color.parseColor("#FF5252"))
+                    
+                    // Determine highest risk (lowest ordinal is highest risk)
+                    val highestRisk = scanResults.minByOrNull { it.riskLevel.ordinal }?.riskLevel ?: RiskLevel.SAFE
+                    
+                    when (highestRisk) {
+                        RiskLevel.CRITICAL, RiskLevel.HIGH -> {
+                            tvStatusValue.text = "At Risk"
+                            tvStatusValue.setTextColor(android.graphics.Color.parseColor("#FF5252")) // Red
+                        }
+                        RiskLevel.MEDIUM -> {
+                            tvStatusValue.text = "Medium Risk"
+                            tvStatusValue.setTextColor(android.graphics.Color.parseColor("#FFA726")) // Orange
+                        }
+                        RiskLevel.LOW -> {
+                            tvStatusValue.text = "Low Risk"
+                            tvStatusValue.setTextColor(android.graphics.Color.parseColor("#FFEE58")) // Yellow
+                        }
+                        else -> {
+                            tvStatusValue.text = "Protected"
+                            tvStatusValue.setTextColor(resources.getColor(R.color.safe_green, theme))
+                        }
+                    }
                 }
             }
         }
