@@ -62,4 +62,4 @@ After scanning, apps are grouped into four categories:
 
 ## Disclaimer
 
-Just a quick heads-up: this is a research prototype built for educational and defensive use. While the heuristics are designed to help you spot threats, it isn't guaranteed to be 100% accurate. Please make sure you actually know what an app is before you go deleting essential system files.
+This is a research prototype built for educational and defensive use. While the heuristics are designed to help you spot threats, it isn't guaranteed to be 100% accurate. Please make sure you actually know what an app is before you go deleting essential system files.
