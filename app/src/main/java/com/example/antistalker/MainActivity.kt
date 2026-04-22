@@ -85,7 +85,7 @@ class MainActivity : AppCompatActivity() {
                 openAppSettings(result.appInfo.packageName)
             },
             onUninstallClick = { result ->
-                openAppSettings(result.appInfo.packageName)
+                requestUninstall(result.appInfo.packageName)
             }
         )
         

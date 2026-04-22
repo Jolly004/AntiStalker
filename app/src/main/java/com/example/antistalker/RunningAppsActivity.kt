@@ -56,7 +56,7 @@ class RunningAppsActivity : AppCompatActivity() {
                 openAppInfo(result.appInfo.packageName)
             },
             onUninstallClick = { result ->
-                openAppInfo(result.appInfo.packageName)
+                requestUninstall(result.appInfo.packageName)
             }
         )
         
@@ -157,26 +157,116 @@ class RunningAppsActivity : AppCompatActivity() {
         }
     }
 
+    // Request code for Device Admin settings
+    private val REQUEST_CODE_DEVICE_ADMIN = 1001
+    private var pendingUninstallPackage: String? = null
+
+    private fun launchUninstallIntent(packageName: String) {
+        val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE).apply {
+            data = Uri.parse("package:$packageName")
+            putExtra(Intent.EXTRA_RETURN_RESULT, true)
+        }
+
+        if (intent.resolveActivity(packageManager) != null) {
+            startActivity(intent)
+        } else {
+            Toast.makeText(
+                this,
+                "Uninstall screen unavailable, opening app settings instead.",
+                Toast.LENGTH_SHORT
+            ).show()
+            openAppInfo(packageName)
+        }
+    }
+
     private fun requestUninstall(packageName: String) {
         try {
-            val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE).apply {
-                data = Uri.parse("package:$packageName")
-                putExtra(Intent.EXTRA_RETURN_RESULT, true)
+            // Check if it's a Device Admin
+            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+            val admins = dpm.activeAdmins
+            var isAdmin = false
+            
+            if (admins != null) {
+                for (admin in admins) {
+                    if (admin.packageName == packageName) {
+                        isAdmin = true
+                        break
+                    }
+                }
             }
 
-            if (intent.resolveActivity(packageManager) != null) {
-                startActivity(intent)
+            if (isAdmin) {
+                pendingUninstallPackage = packageName
+                // Guide user to remove admin rights first
+                android.app.AlertDialog.Builder(this)
+                    .setTitle("Device Admin Detected")
+                    .setMessage("This app is a Device Administrator. You must deactivate its admin rights before uninstalling it.\n\nTap OK to go to Device Admin settings.")
+                    .setPositiveButton("OK") { _, _ ->
+                        try {
+                            // Try manufacturer specific intents first
+                            val manufacturer = android.os.Build.MANUFACTURER.lowercase()
+                            val intent = when {
+                                manufacturer.contains("samsung") -> Intent().setComponent(android.content.ComponentName("com.android.settings", "com.android.settings.Settings\$DeviceAdminSettingsActivity"))
+                                manufacturer.contains("xiaomi") -> Intent().setComponent(android.content.ComponentName("com.android.settings", "com.android.settings.DeviceAdminSettings"))
+                                else -> Intent(Settings.ACTION_SECURITY_SETTINGS)
+                            }
+                            // If specific component fails, it will throw, catch block handles fallback
+                            startActivityForResult(intent, REQUEST_CODE_DEVICE_ADMIN)
+                        } catch (e: Exception) {
+                            // Fallback to general security settings
+                            try {
+                                startActivityForResult(Intent(Settings.ACTION_SECURITY_SETTINGS), REQUEST_CODE_DEVICE_ADMIN)
+                            } catch (e2: Exception) {
+                                startActivityForResult(Intent(Settings.ACTION_SETTINGS), REQUEST_CODE_DEVICE_ADMIN)
+                            }
+                        }
+                    }
+                    .setNegativeButton("Cancel") { _, _ -> pendingUninstallPackage = null }
+                    .show()
             } else {
-                Toast.makeText(
-                    this,
-                    "Uninstall screen unavailable, opening app settings instead.",
-                    Toast.LENGTH_SHORT
-                ).show()
-                openAppInfo(packageName)
+                launchUninstallIntent(packageName)
             }
         } catch (e: Exception) {
             e.printStackTrace()
             Toast.makeText(this, "Error requesting uninstall: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_CODE_DEVICE_ADMIN) {
+            // User returned from Device Admin settings
+            pendingUninstallPackage?.let { packageName ->
+                // Check if admin rights were actually revoked
+                val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+                val admins = dpm.activeAdmins
+                var isAdmin = false
+                if (admins != null) {
+                    for (admin in admins) {
+                        if (admin.packageName == packageName) {
+                            isAdmin = true
+                            break
+                        }
+                    }
+                }
+
+                if (!isAdmin) {
+                    // Admin rights revoked! Proceed to uninstall.
+                    launchUninstallIntent(packageName)
+                } else {
+                    // Still admin
+                    // Prompt user again if they failed to disable it
+                    android.app.AlertDialog.Builder(this)
+                        .setTitle("Admin Rights Still Active")
+                        .setMessage("It looks like the app is still a Device Administrator. You cannot uninstall it until this is disabled.\n\nWould you like to try again?")
+                        .setPositiveButton("Try Again") { _, _ ->
+                            requestUninstall(packageName) // Retry the flow
+                        }
+                        .setNegativeButton("Cancel") { _, _ -> pendingUninstallPackage = null }
+                        .show()
+                }
+                if (!isAdmin) pendingUninstallPackage = null
+            }
         }
     }
 
