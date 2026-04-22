@@ -1,74 +1,65 @@
-# AntiStalker - Android Stalkerware Detection
+# AntiStalker: Android Stalkerware Detection
 
-AntiStalker is a native Android antivirus application designed to identify and mitigate stalkerware—malicious apps that covertly monitor user activity, location, and communications.
+AntiStalker is a native Android antivirus app built to find and remove stalkerware. These are malicious applications that secretly monitor your location, communications, and everyday activity.
 
 ## Project Overview
 
-This tool scans installed applications on an Android device and analyzes them for "stalkerware-like" behavior using a heuristic engine. It flags apps that exhibit suspicious combinations of permissions, attempt to hide their presence, or abuse powerful system features.
+Instead of just relying on a basic list of known malware, AntiStalker uses behavioral analysis. The app's heuristic engine scans your device and scores installed applications based on how they act. If an app requests highly suspicious permission combinations, tries to hide from the app drawer, or abuses powerful system features, AntiStalker flags it for you.
 
-## How It Works
+### What It Looks For
 
-The app uses a **Heuristic Analysis Engine** to score apps based on multiple risk factors. It does not rely solely on a database of known malware signatures (though it supports one), but rather on *behavioral analysis*.
+1. **Permission Abuse (`PermissionAnalyzer.kt`)**
+   The app looks for dangerous combinations of permissions that point to spying. For example:
+   * `ACCESS_FINE_LOCATION` and `READ_SMS` together suggest the app is tracking your location and reading your texts.
+   * `RECORD_AUDIO` and `ACCESS_BACKGROUND_LOCATION` indicate audio and location spying.
+   * `SYSTEM_ALERT_WINDOW` paired with `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` is a classic sign of a persistent, hidden overlay.
+   * `PACKAGE_USAGE_STATS` means the app is monitoring what other apps you use.
 
-### Key Detection Mechanisms
+2. **Hidden Apps (`HiddenAppDetector.kt`)**
+   Stalkerware loves to hide. This detector finds apps that don't have a visible launcher icon. If a hidden app is also asking for dangerous permissions, the risk score shoots up. It also checks against a built-in list of known stalkerware package names.
 
-1.  **Permission Analysis (`PermissionAnalyzer.kt`)**
-    *   Scans for dangerous permission combinations that indicate spying.
-    *   **Examples:**
-        *   `ACCESS_FINE_LOCATION` + `READ_SMS` -> "Tracks Location and SMS"
-        *   `RECORD_AUDIO` + `ACCESS_BACKGROUND_LOCATION` -> "Spying (Audio + Location)"
-        *   `SYSTEM_ALERT_WINDOW` + `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` -> "Persistent Hidden Overlay"
-        *   `PACKAGE_USAGE_STATS` -> "Monitors Other App Usage"
+3. **Accessibility Service Abuse (`AccessibilityDetector.kt`)**
+   Stalkerware often exploits `BIND_ACCESSIBILITY_SERVICE` to read what is on your screen, like WhatsApp messages, or to log your keystrokes without needing root access. AntiStalker highlights any app requesting this capability.
 
-2.  **Hidden App Detection (`HiddenAppDetector.kt`)**
-    *   Identifies apps that do not have a launcher icon (a common tactic to hide from the user).
-    *   Checks if a "hidden" app also requests dangerous permissions (High Risk).
-    *   Checks against a list of known stalkerware package names.
+4. **Device Admin Privileges (`AdminAccessDetector.kt`)**
+   Some malicious apps make themselves Device Administrators so you cannot easily uninstall them. The scanner flags anything trying to do this.
 
-3.  **Accessibility Service Abuse (`AccessibilityDetector.kt`)**
-    *   Detects apps that request `BIND_ACCESSIBILITY_SERVICE`.
-    *   This service is often abused by stalkerware to read screen content (Keylogging, reading WhatsApp messages) without root access.
-
-4.  **Admin Privilege Check (`AdminAccessDetector.kt`)**
-    *   Flags apps that have granted themselves Device Admin rights, making them difficult to uninstall.
-
-5.  **Smart Whitelist System (`Whitelist.kt`)**
-    *   To prevent false positives, the engine whitelists known safe system applications.
-    *   **Logic**:
-        *   **Manual List**: Includes known package names like `com.google.android.gms`, `com.google.android.GoogleCamera`, `com.google.android.apps.safetyhub`.
-        *   **System App Verification**: Checks if an app is a pre-installed System App (`isSystemApp`) AND matches a trusted namespace (`com.google.android.`, `com.android.`, `com.samsung.`).
-        *   **Security Note**: This logic prevents malware from simply naming itself `com.google.android.malware` to bypass detection, as user-installed apps will fail the `isSystemApp` check.
+5. **Smart Whitelisting (`Whitelist.kt`)**
+   To stop the app from constantly flagging standard system functions, we use a smart whitelist. 
+   * It includes known safe packages like `com.google.android.gms` or your default camera app.
+   * It verifies system apps by checking if they are pre-installed AND match a trusted namespace like `com.google.android.` or `com.samsung.`.
+   * This stops malware from simply tricking the scanner by naming itself something like `com.google.android.malware`, because a user-installed app will fail the pre-installed system check.
 
 ### Risk Levels
 
-Apps are categorized into four levels:
-*   **HIGH**: Strong indicators of stalkerware (e.g., Hidden app + Accessibility Service, or known signature).
-*   **MEDIUM**: Suspicious behavior (e.g., Excessive dangerous permissions without being a system app).
-*   **LOW**: Minor concerns.
-*   **SAFE**: No suspicious indicators found or app is whitelisted.
+After scanning, apps are grouped into four categories:
+* **HIGH**: Strong signs of stalkerware, like a hidden app using accessibility services, or a match with a known stalkerware signature.
+* **MEDIUM**: Suspicious behavior, such as a regular user app asking for too many dangerous permissions.
+* **LOW**: Minor concerns worth a quick glance.
+* **SAFE**: The app is either whitelisted or shows no sketchy behavior at all.
 
 ## Getting Started
 
-### Prerequisites
-*   Android Studio (Latest version recommended)
-*   Android SDK (API Level 34 / Android 14)
-*   Java Development Kit (JDK) 17+
+### What You Need
+* Android Studio (latest version is best)
+* Android SDK (API Level 34 / Android 14)
+* Java Development Kit (JDK) 17 or higher
 
 ### Installation
-1.  Open the project in **Android Studio**.
-2.  Allow Gradle to sync dependencies.
-3.  Connect an Android device (with USB Debugging enabled) or start an Emulator.
-4.  Run the application (`Shift + F10`).
+1. Open the project in Android Studio.
+2. Let Gradle sync all the dependencies.
+3. Plug in an Android device with USB Debugging enabled, or boot up an emulator.
+4. Hit Run (`Shift + F10`).
 
-### Usage
-1.  Launch the **AntiStalker** app.
-2.  Grant the "Query All Packages" permission if prompted (automatic on most installs).
-3.  Tap the large **"Start Scan"** button.
-4.  Review the list of flagged applications.
-    *   **Red (HIGH)**: Investigate immediately. If you do not recognize the app, consider uninstalling it.
-    *   **Orange (MEDIUM)**: Review permissions.
-5.  If no threats are found, a "Safe" message will appear.
+### How to Use It
+1. Open the AntiStalker app.
+2. If it asks for the "Query All Packages" permission, go ahead and grant it (though this happens automatically on most setups).
+3. Tap the big **Start Scan** button.
+4. Look through the results:
+   * **Red (HIGH)**: Check these out immediately. If you do not recognize the app, you should probably uninstall it.
+   * **Orange (MEDIUM)**: Double-check what permissions these apps are using.
+5. If everything looks good, you will just see a "Safe" message.
 
 ## Disclaimer
 
-This tool is a research prototype intended for educational and defensive purposes. It provides heuristics to assist in detection but cannot guarantee 100% accuracy. Always verify findings before removing essential system applications.
+Just a quick heads-up: this is a research prototype built for educational and defensive use. While the heuristics are designed to help you spot threats, it isn't guaranteed to be 100% accurate. Please make sure you actually know what an app is before you go deleting essential system files.
