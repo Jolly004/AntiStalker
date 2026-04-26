@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.ImageButton
@@ -143,31 +144,101 @@ class MainActivity : AppCompatActivity() {
     private val REQUEST_CODE_DEVICE_ADMIN = 1001
     private var pendingUninstallPackage: String? = null
 
-    private fun launchUninstallIntent(packageName: String) {
-        val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE).apply {
-            data = Uri.parse("package:$packageName")
-            putExtra(Intent.EXTRA_RETURN_RESULT, true)
+    /**
+     * Tries to open the system "Device admin apps" page directly, where the user
+     * can disable admin rights for a specific app. Different OEMs and Android
+     * versions ship different Settings activities, so we probe a list of known
+     * ComponentNames in order and launch the first one that resolves on this device.
+     *
+     * @return true if we landed on a specific Device-admin page, false if we had
+     *         to fall back to a generic Security Settings page (so the caller
+     *         can show extra guidance to the user).
+     */
+    private fun openDeviceAdminSettings(): Boolean {
+        Log.d("AntiStalker", "[Main] openDeviceAdminSettings()")
+        // Ordered most-specific to least-specific. Most modern devices (Pixel,
+        // Samsung One UI, current Xiaomi/Oppo/OnePlus) all fork AOSP Settings,
+        // so the first or second entry usually wins.
+        val candidates = listOf(
+            // Canonical AOSP target (Pixel, modern Samsung One UI, etc.)
+            android.content.ComponentName(
+                "com.android.settings",
+                "com.android.settings.Settings\$DeviceAdminSettingsActivity"
+            ),
+            // Legacy alias kept by AOSP for backward-compatible shortcuts
+            android.content.ComponentName(
+                "com.android.settings",
+                "com.android.settings.DeviceAdminSettings"
+            ),
+            // Path used by some forks where the activity sits under specialaccess
+            android.content.ComponentName(
+                "com.android.settings",
+                "com.android.settings.applications.specialaccess.deviceadmin.DeviceAdminListActivity"
+            ),
+            // Older MIUI and a few other custom skins
+            android.content.ComponentName(
+                "com.android.settings",
+                "com.android.settings.password.DeviceAdminSettings"
+            ),
+            // Samsung-namespaced Settings (rare — only some older One UI builds)
+            android.content.ComponentName(
+                "com.samsung.android.settings",
+                "com.samsung.android.settings.Settings\$DeviceAdminSettingsActivity"
+            )
+        )
+
+        for (component in candidates) {
+            val intent = Intent().setComponent(component)
+            val resolved = intent.resolveActivity(packageManager)
+            Log.d("AntiStalker", "[Main]   probe ${component.flattenToShortString()} → $resolved")
+            if (resolved != null) {
+                try {
+                    startActivityForResult(intent, REQUEST_CODE_DEVICE_ADMIN)
+                    Log.d("AntiStalker", "[Main]   launched ${component.flattenToShortString()}")
+                    return true
+                } catch (e: Exception) {
+                    Log.w("AntiStalker", "[Main]   launch failed for ${component.flattenToShortString()}", e)
+                    // Permission or other launch failure — try the next candidate.
+                }
+            }
         }
 
-        if (intent.resolveActivity(packageManager) != null) {
-            startActivity(intent)
-        } else {
-            Toast.makeText(
-                this,
-                "Uninstall screen unavailable, opening app settings instead.",
-                Toast.LENGTH_SHORT
-            ).show()
-            openAppSettings(packageName)
+        // No specific Device-admin page resolved. Fall back to Security Settings.
+        Log.w("AntiStalker", "[Main]   no specific admin page resolved, falling back to Security Settings")
+        return try {
+            startActivityForResult(Intent(Settings.ACTION_SECURITY_SETTINGS), REQUEST_CODE_DEVICE_ADMIN)
+            false
+        } catch (e: Exception) {
+            Log.e("AntiStalker", "[Main]   Security Settings failed too, falling back to top-level Settings", e)
+            startActivityForResult(Intent(Settings.ACTION_SETTINGS), REQUEST_CODE_DEVICE_ADMIN)
+            false
         }
     }
 
+    private fun launchUninstallIntent(packageName: String) {
+        Log.d("AntiStalker", "[Main] launchUninstallIntent($packageName) → App Info")
+        // Unified flow: always send the user to the App Info page, regardless of
+        // whether the target is a user app or a system app. From there they can
+        // manually tap Uninstall (user apps) or Disable / Uninstall updates
+        // (system apps) — Android handles the result correctly in both cases.
+        // When the target app disappears, Android automatically pops App Info
+        // and returns the user to AntiStalker.
+        Toast.makeText(
+            this,
+            "Tap Uninstall (or Disable) on the next screen to remove this app.",
+            Toast.LENGTH_LONG
+        ).show()
+        openAppSettings(packageName)
+    }
+
     private fun requestUninstall(packageName: String) {
+        Log.d("AntiStalker", "[Main] requestUninstall($packageName) called")
         try {
             // Check if it's a Device Admin
             val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
             val admins = dpm.activeAdmins
             var isAdmin = false
-            
+
             if (admins != null) {
                 for (admin in admins) {
                     if (admin.packageName == packageName) {
@@ -176,6 +247,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
+            Log.d("AntiStalker", "[Main]   isAdmin=$isAdmin")
 
             if (isAdmin) {
                 pendingUninstallPackage = packageName
@@ -184,23 +256,15 @@ class MainActivity : AppCompatActivity() {
                     .setTitle("Device Admin Detected")
                     .setMessage("This app is a Device Administrator. You must deactivate its admin rights before uninstalling it.\n\nTap OK to go to Device Admin settings.")
                     .setPositiveButton("OK") { _, _ ->
-                        try {
-                            // Try manufacturer specific intents first
-                            val manufacturer = android.os.Build.MANUFACTURER.lowercase()
-                            val intent = when {
-                                manufacturer.contains("samsung") -> Intent().setComponent(android.content.ComponentName("com.android.settings", "com.android.settings.Settings\$DeviceAdminSettingsActivity"))
-                                manufacturer.contains("xiaomi") -> Intent().setComponent(android.content.ComponentName("com.android.settings", "com.android.settings.DeviceAdminSettings"))
-                                else -> Intent(Settings.ACTION_SECURITY_SETTINGS)
-                            }
-                            // If specific component fails, it will throw, catch block handles fallback
-                            startActivityForResult(intent, REQUEST_CODE_DEVICE_ADMIN)
-                        } catch (e: Exception) {
-                            // Fallback to general security settings
-                            try {
-                                startActivityForResult(Intent(Settings.ACTION_SECURITY_SETTINGS), REQUEST_CODE_DEVICE_ADMIN)
-                            } catch (e2: Exception) {
-                                startActivityForResult(Intent(Settings.ACTION_SETTINGS), REQUEST_CODE_DEVICE_ADMIN)
-                            }
+                        val landedOnAdminPage = openDeviceAdminSettings()
+                        if (!landedOnAdminPage) {
+                            // We had to fall back to a generic Settings screen — give the
+                            // user a hint about what to look for so they don't get stuck.
+                            Toast.makeText(
+                                this,
+                                "Could not open Device admin apps directly. Look for \"Device admin apps\" or \"Security\" in Settings.",
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     }
                     .setNegativeButton("Cancel") { _, _ -> pendingUninstallPackage = null }
@@ -209,7 +273,7 @@ class MainActivity : AppCompatActivity() {
                 launchUninstallIntent(packageName)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("AntiStalker", "[Main] requestUninstall threw", e)
             Toast.makeText(this, "Error requesting uninstall: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
@@ -291,74 +355,4 @@ class MainActivity : AppCompatActivity() {
                 progressBar.visibility = View.GONE
                 btnScan.isEnabled = true
                 
-                val tvLastScan: android.widget.TextView = findViewById(R.id.tvLastScan)
-                val tvStatusValue: android.widget.TextView = findViewById(R.id.tvStatusValue)
-                updateLastScanText(tvLastScan)
-                
-                if (scanResults.isEmpty()) {
-                    tvNoThreats.visibility = View.VISIBLE
-                    rvResults.visibility = View.GONE
-                    tvStatusValue.text = "Protected"
-                    tvStatusValue.setTextColor(resources.getColor(R.color.safe_green, theme))
-                } else {
-                    tvNoThreats.visibility = View.GONE
-                    rvResults.visibility = View.VISIBLE
-                    
-                    // Determine highest risk (lowest ordinal is highest risk)
-                    val highestRisk = scanResults.minByOrNull { it.riskLevel.ordinal }?.riskLevel ?: RiskLevel.SAFE
-                    
-                    when (highestRisk) {
-                        RiskLevel.CRITICAL, RiskLevel.HIGH -> {
-                            tvStatusValue.text = "At Risk"
-                            tvStatusValue.setTextColor(android.graphics.Color.parseColor("#FF5252")) // Red
-                        }
-                        RiskLevel.MEDIUM -> {
-                            tvStatusValue.text = "Medium Risk"
-                            tvStatusValue.setTextColor(android.graphics.Color.parseColor("#FFA726")) // Orange
-                        }
-                        RiskLevel.LOW -> {
-                            tvStatusValue.text = "Low Risk"
-                            tvStatusValue.setTextColor(android.graphics.Color.parseColor("#FFEE58")) // Yellow
-                        }
-                        else -> {
-                            tvStatusValue.text = "Protected"
-                            tvStatusValue.setTextColor(resources.getColor(R.color.safe_green, theme))
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun mapToAppInfo(packageInfo: PackageInfo): AppInfo {
-        val pm = packageManager
-        val appName = packageInfo.applicationInfo.loadLabel(pm).toString()
-        val icon = packageInfo.applicationInfo.loadIcon(pm)
-        val isSystemApp = (packageInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-        
-        // Get Installer Source
-        val installerSource = try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                pm.getInstallSourceInfo(packageInfo.packageName).installingPackageName
-            } else {
-                @Suppress("DEPRECATION")
-                pm.getInstallerPackageName(packageInfo.packageName)
-            }
-        } catch (e: Exception) {
-            null
-        }
-        
-        val permissions = packageInfo.requestedPermissions?.toList() ?: emptyList()
-        
-        return AppInfo(
-            packageName = packageInfo.packageName,
-            appName = appName,
-            icon = icon,
-            isSystemApp = isSystemApp,
-            installerSource = installerSource,
-            permissions = permissions,
-            installTime = packageInfo.firstInstallTime,
-            lastUpdateTime = packageInfo.lastUpdateTime
-        )
-    }
-}
+                val tvLastScan: android.widget.TextView = findVi

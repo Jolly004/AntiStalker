@@ -107,7 +107,9 @@ class ScanWorker(appContext: Context, workerParams: WorkerParameters) :
     private fun mapToAppInfo(pm: PackageManager, packageInfo: PackageInfo): AppInfo {
         val appName = packageInfo.applicationInfo.loadLabel(pm).toString()
         val icon = packageInfo.applicationInfo.loadIcon(pm)
-        val isSystemApp = (packageInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+        // FLAG_SYSTEM OR FLAG_UPDATED_SYSTEM_APP — see MainActivity.mapToAppInfo for the full reason.
+        val isSystemApp = (packageInfo.applicationInfo.flags and
+            (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
         
         val installerSource = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -128,9 +130,4 @@ class ScanWorker(appContext: Context, workerParams: WorkerParameters) :
             icon = icon,
             isSystemApp = isSystemApp,
             installerSource = installerSource,
-            permissions = permissions,
-            installTime = packageInfo.firstInstallTime,
-            lastUpdateTime = packageInfo.lastUpdateTime
-        )
-    }
-}
+           

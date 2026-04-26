@@ -1,6 +1,7 @@
 package com.example.antistalker
 
 import android.graphics.Color
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -11,6 +12,7 @@ import androidx.recyclerview.widget.RecyclerView
 
 class ScanResultAdapter(
     private var results: List<ScanResult>,
+    @Suppress("unused") // Kept for source compat with existing call sites. Both card and button now route to onUninstallClick.
     private val onItemClick: (ScanResult) -> Unit,
     private val onUninstallClick: (ScanResult) -> Unit
 ) : RecyclerView.Adapter<ScanResultAdapter.ViewHolder>() {
@@ -51,20 +53,8 @@ class ScanResultAdapter(
 
         holder.riskFactors.text = result.riskFactors.joinToString("\n") { "- $it" }
 
-        // Click listeners
-        holder.itemView.isClickable = true
-        holder.itemView.setOnClickListener { onItemClick(result) }
-        holder.btnUninstall.isClickable = true
-        holder.btnUninstall.isFocusable = true
-        holder.btnUninstall.setOnClickListener { 
-            onUninstallClick(result)
-        }
-    }
-
-    override fun getItemCount() = results.size
-
-    fun updateData(newResults: List<ScanResult>) {
-        results = newResults
-        notifyDataSetChanged()
-    }
-}
+        // Click listeners — belt-and-braces approach.
+        // On some Samsung One UI builds the inner MaterialButton's click listener
+        // never fires because the parent MaterialCardView is consuming the touch
+        // sequence. Rather than chase that platform quirk, we wire BOTH the card
+        // and the button to the SAME uninstall callback.

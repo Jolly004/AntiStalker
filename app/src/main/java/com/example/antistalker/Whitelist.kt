@@ -52,52 +52,54 @@ class Whitelist {
             "com.android.bluetooth",                  // Bluetooth
             "com.android.nfc",                        // NFC
             "com.android.location.fused",             // Fused Location
-            "com.android.server.telecom"              // Telecom Server
+            "com.android.server.telecom",             // Telecom Server
+
+            // --- Samsung specific stragglers (often pre-installed but not under com.samsung.android.*) ---
+            "com.osp.app.signin",                     // Samsung Account
+            "com.wssyncmldm",                         // Samsung Software Update
+            "com.wsomacp",                            // Samsung Configuration Message
+            "com.samsung.knox.securefolder",          // Samsung Secure Folder
+            "com.samsung.android.spay",               // Samsung Pay / Wallet
+            "com.samsung.android.spayfw",             // Samsung Pay Framework
+
+            // --- Google legacy / discontinued but still installable ---
+            "com.google.android.music",               // Google Play Music (discontinued, still on some devices)
+            "com.google.android.videos",              // Google Play Movies (discontinued)
+            "com.google.android.play.games",          // Play Games
+            "com.google.android.apps.subscriptions.red", // Google One
+            "com.google.android.apps.fitness"         // Google Fit
         )
 
-        fun isWhitelisted(packageName: String, isSystemApp: Boolean): Boolean {
-            // 1. Check exact matches in the manual list
-            if (safePackages.contains(packageName)) return true
+        // Curated allowlist of well-known consumer apps with massive install bases that
+        // legitimately request scary-looking permission combinations (location + audio,
+        // overlay + battery exemption, etc.).
+        //
+        // IMPORTANT: This is checked AFTER the known-stalkerware signature match in the
+        // engine, so a stalkerware app that spoofs one of these package names still gets
+        // caught by the signature layer rather than being silently allowed.
+        private val popularApps = setOf(
+            // Messaging / calls
+            "com.whatsapp",                       // WhatsApp
+            "com.whatsapp.w4b",                   // WhatsApp Business
+            "com.skype.raider",                   // Skype
+            "com.skype.m2",                       // Skype Lite
+            "org.telegram.messenger",             // Telegram
+            "org.telegram.messenger.web",         // Telegram (web build)
+            "org.thoughtcrime.securesms",         // Signal
+            "com.discord",                        // Discord
+            "com.facebook.orca",                  // Messenger
+            "com.facebook.mlite",                 // Messenger Lite
+            "com.viber.voip",                     // Viber
+            "jp.naver.line.android",              // LINE
+            "com.kakao.talk",                     // KakaoTalk
+            "com.tencent.mm",                     // WeChat
+            "us.zoom.videomeetings",              // Zoom
+            "com.microsoft.teams",                // Microsoft Teams
+            "com.cisco.webex.meetings",           // Webex
+            "com.google.android.apps.tachyon",    // Google Meet / Duo (also in safePackages)
 
-            // 2. Check for System Apps with known safe namespaces
-            // Only apply wildcard matching if it is actually a system app to prevent
-            // malicious user apps from mimicking these names (e.g. com.google.android.malware)
-            if (isSystemApp) {
-                if (packageName.startsWith("com.google.android.")) return true
-                if (packageName.startsWith("com.android.")) return true
-                if (packageName.startsWith("com.sec.android.")) return true // Samsung System
-                if (packageName.startsWith("com.samsung.android.")) return true // Samsung System
-                if (packageName.startsWith("com.verizon.")) return true // Verizon
-                if (packageName.startsWith("com.vzw.")) return true // Verizon
-                if (packageName.startsWith("com.att.")) return true // AT&T
-                if (packageName.startsWith("com.tmobile.")) return true // T-Mobile
-                if (packageName.startsWith("com.sprint.")) return true // Sprint
-                if (packageName.startsWith("com.huawei.")) return true // Huawei
-                if (packageName.startsWith("com.xiaomi.")) return true // Xiaomi
-                if (packageName.startsWith("com.oppo.")) return true // Oppo
-                if (packageName.startsWith("com.oneplus.")) return true // OnePlus
-                if (packageName.startsWith("com.motorola.")) return true // Motorola
-                if (packageName.startsWith("com.lge.")) return true // LG
-                
-                // --- UK Carriers ---
-                if (packageName.startsWith("com.vodafone.")) return true // Vodafone
-                if (packageName.startsWith("uk.co.vodafone.")) return true // Vodafone UK
-                if (packageName.startsWith("com.o2.")) return true // O2
-                if (packageName.startsWith("uk.co.o2.")) return true // O2 UK
-                if (packageName.startsWith("com.ee.")) return true // EE
-                if (packageName.startsWith("uk.co.ee.")) return true // EE UK
-                if (packageName.startsWith("com.three.")) return true // Three
-                if (packageName.startsWith("com.hutchison3g.")) return true // Three (Parent)
-                if (packageName.startsWith("com.tescomobile.")) return true // Tesco Mobile
-                if (packageName.startsWith("com.virginmobile.")) return true // Virgin Mobile
-                if (packageName.startsWith("com.sky.mobile.")) return true // Sky Mobile
-                if (packageName.startsWith("com.giffgaff.")) return true // Giffgaff
-                if (packageName.startsWith("com.talktalk.")) return true // TalkTalk
-                if (packageName.startsWith("com.bt.")) return true // BT Mobile
-                if (packageName.startsWith("com.plusnet.")) return true // Plusnet
-            }
-
-            return false
-        }
-    }
-}
+            // Social / media
+            "com.facebook.katana",                // Facebook
+            "com.facebook.lite",                  // Facebook Lite
+            "com.instagram.android",              // Instagram
+            "com.instagram.lite",                 // I

@@ -162,21 +162,15 @@ class RunningAppsActivity : AppCompatActivity() {
     private var pendingUninstallPackage: String? = null
 
     private fun launchUninstallIntent(packageName: String) {
-        val intent = Intent(Intent.ACTION_UNINSTALL_PACKAGE).apply {
-            data = Uri.parse("package:$packageName")
-            putExtra(Intent.EXTRA_RETURN_RESULT, true)
-        }
-
-        if (intent.resolveActivity(packageManager) != null) {
-            startActivity(intent)
-        } else {
-            Toast.makeText(
-                this,
-                "Uninstall screen unavailable, opening app settings instead.",
-                Toast.LENGTH_SHORT
-            ).show()
-            openAppInfo(packageName)
-        }
+        // Unified flow: always send the user to the App Info page where they can
+        // manually tap Uninstall (or Disable for system apps). Android pops back
+        // to AntiStalker automatically once the target app is gone.
+        Toast.makeText(
+            this,
+            "Tap Uninstall (or Disable) on the next screen to remove this app.",
+            Toast.LENGTH_LONG
+        ).show()
+        openAppInfo(packageName)
     }
 
     private fun requestUninstall(packageName: String) {
@@ -273,7 +267,9 @@ class RunningAppsActivity : AppCompatActivity() {
     private fun mapToAppInfo(pm: PackageManager, packageInfo: android.content.pm.PackageInfo): AppInfo {
         val appName = packageInfo.applicationInfo.loadLabel(pm).toString()
         val icon = packageInfo.applicationInfo.loadIcon(pm)
-        val isSystemApp = (packageInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+        // FLAG_SYSTEM OR FLAG_UPDATED_SYSTEM_APP — see MainActivity.mapToAppInfo for the full reason.
+        val isSystemApp = (packageInfo.applicationInfo.flags and
+            (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0
         
         val installerSource = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -296,7 +292,4 @@ class RunningAppsActivity : AppCompatActivity() {
             installerSource = installerSource,
             permissions = permissions,
             installTime = packageInfo.firstInstallTime,
-            lastUpdateTime = packageInfo.lastUpdateTime
-        )
-    }
-}
+            lastU
